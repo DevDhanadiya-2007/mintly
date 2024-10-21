@@ -6,10 +6,13 @@
                 "packages/ui/src/*"
             ],
             "@web/*": [
-                "packages/web/src/*"
+                "apps/web/src/*"
             ],
             "@backend/*": [
-                "packages/backend/src/*"
+                "apps/backend/src/*"
+            ],
+            "@db/*": [
+                "packages/database/*"
             ]
         },
         "target": "ESNext",
