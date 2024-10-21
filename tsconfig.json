@@ -1,0 +1,30 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@ui/*": [
+                "packages/ui/src/*"
+            ],
+            "@web/*": [
+                "packages/web/src/*"
+            ],
+            "@backend/*": [
+                "packages/backend/src/*"
+            ]
+        },
+        "target": "ESNext",
+        "module": "ESNext",
+        "lib": [
+            "ESNext",
+            "DOM"
+        ],
+        "moduleResolution": "Node",
+        "jsx": "react-jsx",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "strict": true
+    },
+    "include": [
+        "packages/*/src"
+    ]
+}
