@@ -1,189 +1,294 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, LogIn } from 'lucide-react'
-import { z } from 'zod'
-import { Button, Input, Label } from "@ui/index"
-import axios from 'axios'
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import { Button, Input, Label, Separator } from '@ui/index'
 import { useRouter } from 'next/navigation'
+import axios from "axios"
 
-const schema = z.object({
-    email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters long'),
+const registerSchema = z.object({
+    email: z.string().email({ message: "Invalid email address" }),
+    password: z.string().min(8, { message: "Password must be at least 8 characters long" }),
 })
 
-const Toast = ({ message, type }: { message: string; type: 'success' | 'error' }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 50, scale: 0.3 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-        className={`fixed bottom-4 right-4 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-4 py-2 rounded-md shadow-lg text-sm`}
-    >
-        {message}
-    </motion.div>
-)
+type RegisterForm = z.infer<typeof registerSchema>
 
-export default function page() {
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
-    const [showPassword, setShowPassword] = useState(false)
-    const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+export default function RegisterPage() {
     const router = useRouter()
+    const [isLoading, setIsLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
+    const { register, handleSubmit, setError, formState: { errors } } = useForm<RegisterForm>({
+        resolver: zodResolver(registerSchema),
+    })
 
-    useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => setToast(null), 3000)
-            return () => clearTimeout(timer)
-        }
-    }, [toast])
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const onSubmit = async (data: RegisterForm) => {
+        setIsLoading(true)
         try {
-            schema.parse({ email, password })
-            const response = await axios.post('http://localhost:4000/api/auth/register',
-                { email, password },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    withCredentials: true,
-                }
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+            if (!backendUrl) {
+                throw new Error('Backend URL is not defined')
+            }
+
+            registerSchema.parse(data)
+
+            const response = await axios.post(`${backendUrl}/api/auth/register`,
+                { email: data.email, password: data.password },
+                { withCredentials: true }
             )
+
             if (response.status === 201) {
-                setToast({ message: 'Registration successful!', type: 'success' })
-                setTimeout(() => router.push('/'), 2000)
+                toast.success("Registration Successful", {
+                    position: "top-center",
+                    autoClose: 1500,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                })
+                setTimeout(() => router.push('/auth/login'), 3000)
             }
         } catch (error) {
             if (error instanceof z.ZodError) {
-                const newErrors = error.flatten().fieldErrors
-                setErrors(newErrors)
-                setToast({ message: 'Please check your email and password', type: 'error' })
+                error.errors.forEach((err) => {
+                    setError(err.path[0] as "email" | "password", {
+                        type: "manual",
+                        message: err.message
+                    })
+                })
+                toast.error("Invalid Credentials", {
+                    position: "top-center",
+                    autoClose: 1500,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                })
             } else if (axios.isAxiosError(error)) {
                 const message = error.response?.data?.message || 'An error occurred'
-                setErrors({ email: message })
-                setToast({ message, type: 'error' })
+                setError("email", {
+                    type: "manual",
+                    message: message
+                })
+                toast.error(message, {
+                    position: "top-center",
+                    autoClose: 1500,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                })
             } else {
                 console.error('Unexpected error:', error)
-                setToast({ message: 'An unexpected error occurred', type: 'error' })
+                toast.error("An unexpected error occurred", {
+                    position: "top-center",
+                    autoClose: 1500,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                })
             }
+        } finally {
+            setIsLoading(false)
         }
     }
 
-    const handleGoogleSignIn = () => {
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword)
     }
 
     return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 -mt-16">
+        <div className="min-h-screen flex items-center justify-center bg-black p-4">
+            <ToastContainer
+                position="top-center"
+                autoClose={1500}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="dark"
+            />
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="w-full max-w-md space-y-8"
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="w-full max-w-md"
             >
-                <div className="text-center">
-                    <motion.h2
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2, duration: 0.5 }}
-                        className="mt-6 text-3xl font-extrabold"
-                    >
-                        Create your account
-                    </motion.h2>
-                </div>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="space-y-4 rounded-md shadow-sm">
-                        <div>
-                            <Label htmlFor="email" className="sr-only">
-                                Email address
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    required
-                                    className={`appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border ${errors.email ? 'border-red-500' : 'border-gray-700'} placeholder-gray-500 text-white bg-black focus:outline-none focus:ring-white focus:border-white focus:z-10 sm:text-sm`}
-                                    placeholder="Email address"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                            </div>
-                        </div>
-                        <div>
-                            <Label htmlFor="password" className="sr-only">
-                                Password
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    id="password"
-                                    name="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    autoComplete="new-password"
-                                    required
-                                    className={`appearance-none rounded-md relative block w-full px-3 py-2 pl-10 pr-10 border ${errors.password ? 'border-red-500' : 'border-gray-700'} placeholder-gray-500 text-white bg-black focus:outline-none focus:ring-white focus:border-white focus:z-10 sm:text-sm`}
-                                    placeholder="Password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <Button
-                            type="submit"
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-white hover:bg-gray-200"
+                <motion.div
+                    className="bg-black rounded-lg shadow-xl overflow-hidden border border-gray-800"
+                    initial={{ scale: 0.95 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                    <div className="p-8">
+                        <motion.h2
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+                            className="text-3xl font-bold text-center text-white mb-8"
                         >
-                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                                <ArrowRight className="h-5 w-5 text-gray-700 group-hover:text-gray-900" aria-hidden="true" />
-                            </span>
-                            Register
-                        </Button>
-                    </div>
-                </form>
-
-                <div className="mt-6">
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-700" />
-                        </div>
-                        <div className="relative flex justify-center text-sm">
-                            <span className="px-2 bg-black text-gray-400">Or continue with</span>
-                        </div>
-                    </div>
-
-                    <div className="mt-6">
-                        <motion.div>
-                            <Button
-                                onClick={handleGoogleSignIn}
-                                className="w-full flex items-center justify-center px-4 py-2 border border-gray-700 rounded-md shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700"
+                            Create an account
+                        </motion.h2>
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                            <div>
+                                <Label htmlFor="email" className="text-sm font-medium text-gray-300">
+                                    Email address
+                                </Label>
+                                <div className="mt-1 relative">
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="Enter your email"
+                                        className="pl-10 bg-black border-gray-700 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500 transition-all duration-300"
+                                        {...register("email")}
+                                        aria-invalid={errors.email ? "true" : "false"}
+                                    />
+                                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                                </div>
+                                <AnimatePresence>
+                                    {errors.email && (
+                                        <motion.p
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="text-sm text-red-400 flex items-center mt-1"
+                                        >
+                                            <AlertCircle className="h-4 w-4 mr-1" />
+                                            {errors.email.message}
+                                        </motion.p>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                            <div>
+                                <Label htmlFor="password" className="text-sm font-medium text-gray-300">
+                                    Password
+                                </Label>
+                                <div className="mt-1 relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Enter your password"
+                                        className="pl-10 pr-10 bg-black border-gray-700 text-white placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500 transition-all duration-300"
+                                        {...register("password")}
+                                        aria-invalid={errors.password ? "true" : "false"}
+                                    />
+                                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+                                    <button
+                                        type="button"
+                                        onClick={togglePasswordVisibility}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none transition-colors duration-300"
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="h-5 w-5" />
+                                        ) : (
+                                            <Eye className="h-5 w-5" />
+                                        )}
+                                    </button>
+                                </div>
+                                <AnimatePresence>
+                                    {errors.password && (
+                                        <motion.p
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="text-sm text-red-400 flex items-center mt-1"
+                                        >
+                                            <AlertCircle className="h-4 w-4 mr-1" />
+                                            {errors.password.message}
+                                        </motion.p>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                             >
-                                <LogIn className="h-5 w-5 mr-2" aria-hidden="true" />
-                                Continue with Google
-                            </Button>
-                        </motion.div>
+                                <Button
+                                    type="submit"
+                                    className="w-full bg-white hover:bg-gray-200 text-black transition-all duration-300 flex items-center justify-center"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Please wait
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                            Create account
+                                        </>
+                                    )}
+                                </Button>
+                            </motion.div>
+                            <Separator className="my-4 bg-gray-700" />
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full bg-transparent text-white border-gray-700 hover:bg-gray-800 transition-all duration-300 flex items-center justify-center"
+                                    onClick={() => toast.error("Google sign-in not implemented yet", {
+                                        position: "top-center",
+                                        autoClose: 1500,
+                                        hideProgressBar: false,
+                                        closeOnClick: true,
+                                        pauseOnHover: true,
+                                        draggable: true,
+                                    })}
+                                >
+                                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            fill="currentColor"
+                                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                        />
+                                        <path
+                                            fill="currentColor"
+                                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                        />
+                                    </svg>
+                                    Continue with Google
+                                </Button>
+                            </motion.div>
+                        </form>
                     </div>
-                </div>
+                    <div className="px-8 py-4 bg-black border-t border-gray-800">
+                        <p className="text-sm text-gray-400 text-center">
+                            Already have an account?{' '}
+                            <motion.a
+                                href="/auth/login"
+                                className="font-medium text-cyan-400 hover:text-cyan-300 transition-colors duration-300"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                Sign in
+                            </motion.a>
+                        </p>
+                    </div>
+                </motion.div>
             </motion.div>
-            <AnimatePresence>
-                {toast && (
-                    <Toast message={toast.message} type={toast.type} />
-                )}
-            </AnimatePresence>
         </div>
     )
 }

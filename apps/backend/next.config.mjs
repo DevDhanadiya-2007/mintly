@@ -1,22 +1,20 @@
 /** @type {import('next').NextConfig} */
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const nextConfig = {
-    webpack: (config, { isServer }) => {
-        config.cache = {
-            type: 'filesystem',
-            cacheDirectory: path.resolve(__dirname, '.next/cache'),
-            buildDependencies: {
-                config: [__filename],
-            },
-        };
-
-        return config;
+    reactStrictMode: true,
+    async headers() {
+        return [
+            {
+                source: '/api/:path*',
+                headers: [
+                    { key: 'Access-Control-Allow-Credentials', value: 'true' },
+                    { key: 'Access-Control-Allow-Origin', value: 'http://localhost:3000' },
+                    { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT,OPTIONS' },
+                    { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization' },
+                ]
+            }
+        ]
     },
+    middleware: ['cors'], // Enable the CORS middleware
 };
 
 export default nextConfig;
